@@ -1,0 +1,45 @@
+---
+import SiteLayout from '@/layouts/SiteLayout.astro';
+import SectionHeading from '@/components/SectionHeading.astro';
+import BlogCard from '@/components/BlogCard.astro';
+import { fetchPosts } from '@/lib/hashnode';
+
+const posts = await fetchPosts(50);
+---
+<SiteLayout title="Blog" description="Notes on systems engineering and production trade-offs.">
+  <section class="section-block">
+    <SectionHeading title="Blog" subtitle="Posts fetched from Hashnode and rendered here." />
+
+    <div class="mt-6 max-w-md">
+      <label class="text-xs uppercase tracking-[0.2em] text-base-400" for="post-search">Search</label>
+      <input
+        id="post-search"
+        type="search"
+        placeholder="Filter by title, tag, or keyword"
+        class="mt-2 w-full rounded-xl border border-base-200 dark:border-base-800 bg-transparent px-4 py-2 text-sm text-base-700 dark:text-base-200"
+        data-post-search
+      />
+    </div>
+
+    <div class="mt-10 grid gap-6 md:grid-cols-2" data-post-grid>
+      {posts.map((post) => (
+        <div data-post-card data-search={`${post.title} ${post.brief} ${post.tags?.map((tag) => tag.name).join(' ')}`.toLowerCase()}>
+          <BlogCard post={post} />
+        </div>
+      ))}
+    </div>
+  </section>
+</SiteLayout>
+
+<script is:inline>
+  const input = document.querySelector('[data-post-search]');
+  const cards = Array.from(document.querySelectorAll('[data-post-card]'));
+
+  input?.addEventListener('input', (event) => {
+    const query = event.target.value.trim().toLowerCase();
+    cards.forEach((card) => {
+      const haystack = card.dataset.search || '';
+      card.classList.toggle('hidden', query.length > 0 && !haystack.includes(query));
+    });
+  });
+</script>

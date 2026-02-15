@@ -1,0 +1,73 @@
+---
+import SiteLayout from '@/layouts/SiteLayout.astro';
+import SectionHeading from '@/components/SectionHeading.astro';
+import ProjectCard from '@/components/ProjectCard.astro';
+import { getCollection } from 'astro:content';
+
+const projects = await getCollection('projects');
+const tags = Array.from(new Set(projects.flatMap((project) => project.data.tags))).sort();
+---
+<SiteLayout title="Projects" description="Selected systems and product work.">
+  <section class="section-block">
+    <SectionHeading
+      title="Projects"
+      subtitle="Filter by focus area. Each project summary should describe the constraint, the trade-off, and the outcome."
+    />
+
+    <div class="mt-8 flex flex-wrap gap-2" data-tag-filters>
+      <button
+        class="rounded-full border border-base-200 dark:border-base-800 px-4 py-2 text-xs font-medium text-base-600 dark:text-base-300 hover:text-accent"
+        data-tag="all"
+      >
+        All
+      </button>
+      {tags.map((tag) => (
+        <button
+          class="rounded-full border border-base-200 dark:border-base-800 px-4 py-2 text-xs font-medium text-base-600 dark:text-base-300 hover:text-accent"
+          data-tag={tag}
+        >
+          {tag}
+        </button>
+      ))}
+    </div>
+
+    <div class="mt-8 grid gap-6 md:grid-cols-2" data-project-grid>
+      {projects.map((project) => (
+        <div data-tags={project.data.tags.join(',')}>
+          <ProjectCard project={project} />
+        </div>
+      ))}
+    </div>
+  </section>
+</SiteLayout>
+
+<script is:inline>
+  const filterContainer = document.querySelector('[data-tag-filters]');
+  const cards = Array.from(document.querySelectorAll('[data-project-grid] [data-tags]'));
+
+  const setActive = (button) => {
+    filterContainer?.querySelectorAll('button').forEach((btn) => {
+      btn.classList.remove('text-accent', 'border-accent/60', 'bg-accent/10');
+      btn.classList.add('text-base-600', 'dark:text-base-300');
+    });
+    button.classList.add('text-accent', 'border-accent/60', 'bg-accent/10');
+    button.classList.remove('text-base-600', 'dark:text-base-300');
+  };
+
+  filterContainer?.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+
+    const tag = button.dataset.tag;
+    setActive(button);
+
+    cards.forEach((card) => {
+      const tags = (card.dataset.tags || '').split(',');
+      const show = tag === 'all' || tags.includes(tag);
+      card.classList.toggle('hidden', !show);
+    });
+  });
+
+  const firstButton = filterContainer?.querySelector('button');
+  if (firstButton) setActive(firstButton);
+</script>

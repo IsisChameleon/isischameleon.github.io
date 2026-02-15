@@ -1,0 +1,149 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+  --base-50: 248 249 251;
+  --base-100: 238 240 244;
+  --base-200: 220 225 232;
+  --base-300: 196 203 213;
+  --base-400: 147 156 170;
+  --base-500: 108 118 132;
+  --base-600: 81 91 103;
+  --base-700: 60 69 80;
+  --base-800: 40 47 56;
+  --base-900: 24 28 35;
+  --base-950: 15 18 22;
+  --accent: 28 110 124;
+  --accent-muted: 122 171 180;
+}
+
+.dark {
+  --base-50: 15 18 22;
+  --base-100: 24 28 35;
+  --base-200: 35 41 50;
+  --base-300: 49 57 67;
+  --base-400: 79 88 101;
+  --base-500: 120 129 141;
+  --base-600: 154 162 172;
+  --base-700: 190 195 203;
+  --base-800: 220 223 228;
+  --base-900: 238 240 244;
+  --base-950: 248 249 251;
+  --accent: 104 191 202;
+  --accent-muted: 71 141 150;
+}
+
+* {
+  border-color: rgb(var(--base-200) / 1);
+}
+
+body {
+  @apply bg-base-50 text-base-900 font-sans antialiased;
+  font-feature-settings: "liga" 1, "kern" 1, "ss01" 1;
+  text-rendering: optimizeLegibility;
+}
+
+.dark body {
+  @apply bg-base-950 text-base-100;
+}
+
+a {
+  @apply text-accent hover:text-accent-muted transition-colors;
+}
+
+::selection {
+  background: rgb(var(--accent) / 0.25);
+}
+
+.section-block {
+  @apply py-14 md:py-20;
+}
+
+.surface {
+  @apply bg-white/70 dark:bg-base-900/60 border border-base-200 dark:border-base-800 rounded-2xl shadow-soft;
+}
+
+.hr-muted {
+  @apply border-t border-base-200/70 dark:border-base-800/70;
+}
+
+@layer components {
+  .prose {
+    @apply max-w-none text-base-800 dark:text-base-200 leading-relaxed;
+  }
+
+  .prose h1,
+  .prose h2,
+  .prose h3,
+  .prose h4 {
+    @apply text-base-950 dark:text-base-50 font-semibold tracking-tight;
+  }
+
+  .prose h1 {
+    @apply text-3xl md:text-4xl;
+  }
+
+  .prose h2 {
+    @apply text-2xl md:text-3xl mt-10;
+  }
+
+  .prose h3 {
+    @apply text-xl md:text-2xl mt-8;
+  }
+
+  .prose p {
+    @apply my-4;
+  }
+
+  .prose a {
+    @apply underline underline-offset-4 decoration-base-300 dark:decoration-base-700;
+  }
+
+  .prose code {
+    @apply font-mono text-sm bg-base-100 dark:bg-base-800 px-1.5 py-0.5 rounded;
+  }
+
+  .prose pre {
+    @apply bg-base-100 dark:bg-base-900 text-base-900 dark:text-base-100 rounded-xl p-4 overflow-x-auto;
+  }
+
+  .prose blockquote {
+    @apply border-l-2 border-accent/60 pl-4 text-base-700 dark:text-base-300 italic;
+  }
+
+  .prose ul,
+  .prose ol {
+    @apply my-4 pl-6;
+  }
+
+  .prose li {
+    @apply my-2;
+  }
+
+  .prose table {
+    @apply w-full border border-base-200 dark:border-base-800;
+  }
+
+  .prose th,
+  .prose td {
+    @apply border border-base-200 dark:border-base-800 px-3 py-2;
+  }
+
+  .prose img {
+    @apply rounded-xl border border-base-200/60 dark:border-base-800/60;
+  }
+
+  .prose iframe {
+    @apply w-full rounded-xl border border-base-200/60 dark:border-base-800/60;
+    aspect-ratio: 16 / 9;
+    height: auto;
+  }
+
+  .prose .embed {
+    @apply my-6;
+  }
+}

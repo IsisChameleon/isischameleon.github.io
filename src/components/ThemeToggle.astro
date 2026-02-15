@@ -1,0 +1,34 @@
+<button
+  class="inline-flex items-center justify-center rounded-full border border-base-200 dark:border-base-800 px-3 py-2 text-xs font-medium text-base-700 dark:text-base-200 hover:border-accent/60 hover:text-accent"
+  type="button"
+  aria-label="Toggle theme"
+  data-theme-toggle
+>
+  Theme
+</button>
+
+<script is:inline>
+  const toggle = document.querySelector('[data-theme-toggle]');
+  const stored = localStorage.getItem('theme');
+  const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const applyTheme = (value) => {
+    if (value === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  if (stored) {
+    applyTheme(stored);
+  } else if (systemPrefersDark) {
+    applyTheme('dark');
+  }
+
+  toggle?.addEventListener('click', () => {
+    const isDark = document.documentElement.classList.contains('dark');
+    const next = isDark ? 'light' : 'dark';
+    applyTheme(next);
+    localStorage.setItem('theme', next);
+  });
+</script>

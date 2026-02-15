@@ -1,0 +1,25 @@
+---
+import BaseHead from '@/components/BaseHead.astro';
+import Header from '@/components/Header.astro';
+import Footer from '@/components/Footer.astro';
+import '@/styles/global.css';
+
+const { title, description, image } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead title={title} description={description} image={image} />
+  </head>
+  <body class="relative min-h-screen">
+    <div class="pointer-events-none absolute inset-0 -z-10">
+      <div class="absolute -top-40 right-10 h-72 w-72 rounded-full bg-accent/10 blur-3xl"></div>
+      <div class="absolute top-40 left-0 h-96 w-96 rounded-full bg-base-200/60 dark:bg-base-900/60 blur-3xl"></div>
+    </div>
+    <Header />
+    <main class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

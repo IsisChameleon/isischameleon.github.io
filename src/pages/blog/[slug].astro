@@ -1,0 +1,54 @@
+---
+import SiteLayout from '@/layouts/SiteLayout.astro';
+import { fetchPost, fetchPosts } from '@/lib/hashnode';
+import { markdown } from '@astropub/md';
+
+export async function getStaticPaths() {
+  const posts = await fetchPosts(200);
+  return posts.map((post) => ({ params: { slug: post.slug } }));
+}
+
+const { slug } = Astro.params;
+const post = slug ? await fetchPost(slug) : null;
+
+if (!post) {
+  throw new Error(`Hashnode post not found: ${slug}`);
+}
+
+const markdownResult = post.content?.markdown ? await markdown(post.content.markdown) : null;
+const markdownHtml = typeof markdownResult === 'string' ? markdownResult : null;
+const MarkdownContent = typeof markdownResult === 'string' ? null : markdownResult;
+const html = post.content?.html ?? null;
+const published = new Date(post.publishedAt);
+const formatted = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(published);
+---
+<SiteLayout title={post.title} description={post.brief}>
+  <article class="section-block">
+    <div class="mx-auto max-w-3xl">
+      <div class="text-xs uppercase tracking-[0.2em] text-base-400">{formatted}</div>
+      <h1 class="mt-4 text-3xl md:text-4xl font-semibold tracking-tight text-base-950 dark:text-base-50">
+        {post.title}
+      </h1>
+      <p class="mt-4 text-base-600 dark:text-base-300">{post.brief}</p>
+      <div class="mt-4 flex flex-wrap gap-2 text-xs text-base-500">
+        {post.tags?.map((tag) => (
+          <span class="rounded-full border border-base-200 dark:border-base-800 px-3 py-1">{tag.name}</span>
+        ))}
+        {post.readTimeInMinutes ? <span>{post.readTimeInMinutes} min read</span> : null}
+      </div>
+      {post.coverImage?.url ? (
+        <img
+          src={post.coverImage.url}
+          alt={post.title}
+          class="mt-8 w-full rounded-2xl border border-base-200/60 dark:border-base-800/60"
+          loading="eager"
+        />
+      ) : null}
+      <div class="mt-10 prose">
+        {html ? <div set:html={html} /> : null}
+        {!html && markdownHtml ? <div set:html={markdownHtml} /> : null}
+        {!html && MarkdownContent ? <MarkdownContent /> : null}
+      </div>
+    </div>
+  </article>
+</SiteLayout>

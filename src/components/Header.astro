@@ -1,0 +1,68 @@
+---
+import ThemeToggle from './ThemeToggle.astro';
+
+const path = Astro.url.pathname;
+const navItems = [
+  { href: '/', label: 'Home' },
+  { href: '/experience', label: 'Experience' },
+  { href: '/projects', label: 'Projects' },
+  { href: '/blog', label: 'Blog' },
+  { href: '/about', label: 'About' },
+  { href: '/contact', label: 'Contact' },
+];
+
+const isActive = (href) => (href === '/' ? path === '/' : path.startsWith(href));
+---
+<header class="sticky top-0 z-50 border-b border-base-200/80 dark:border-base-800/80 bg-base-50/80 dark:bg-base-950/80 backdrop-blur">
+  <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between py-4">
+      <a href="/" class="text-sm font-semibold tracking-wide text-base-900 dark:text-base-50">
+        Isis Chameleon
+      </a>
+      <nav class="hidden md:flex items-center gap-6 text-sm">
+        {navItems.map((item) => (
+          <a
+            href={item.href}
+            class={`transition-colors ${
+              isActive(item.href)
+                ? 'text-accent font-semibold'
+                : 'text-base-600 dark:text-base-300 hover:text-accent'
+            }`}
+          >
+            {item.label}
+          </a>
+        ))}
+      </nav>
+      <div class="flex items-center gap-3">
+        <ThemeToggle />
+        <button class="md:hidden text-base-700 dark:text-base-200" type="button" aria-label="Open menu" data-mobile-toggle>
+          Menu
+        </button>
+      </div>
+    </div>
+    <div class="md:hidden pb-4 hidden" data-mobile-menu>
+      <div class="flex flex-col gap-2 text-sm">
+        {navItems.map((item) => (
+          <a
+            href={item.href}
+            class={`transition-colors ${
+              isActive(item.href)
+                ? 'text-accent font-semibold'
+                : 'text-base-600 dark:text-base-300 hover:text-accent'
+            }`}
+          >
+            {item.label}
+          </a>
+        ))}
+      </div>
+    </div>
+  </div>
+</header>
+
+<script is:inline>
+  const toggle = document.querySelector('[data-mobile-toggle]');
+  const menu = document.querySelector('[data-mobile-menu]');
+  toggle?.addEventListener('click', () => {
+    menu?.classList.toggle('hidden');
+  });
+</script>

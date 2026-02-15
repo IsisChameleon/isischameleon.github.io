@@ -1,0 +1,31 @@
+---
+import SiteLayout from '@/layouts/SiteLayout.astro';
+import SectionHeading from '@/components/SectionHeading.astro';
+import { SITE } from '@/lib/site';
+---
+<SiteLayout title="Contact" description="Get in touch for systems work or collaboration.">
+  <section class="section-block">
+    <SectionHeading
+      title="Contact"
+      subtitle="Pick the channel that fits. Replace TODO placeholders with your real links."
+    />
+    <div class="mt-8 grid gap-6 md:grid-cols-2">
+      <div class="surface p-6 space-y-4">
+        <h3 class="text-lg font-semibold text-base-950 dark:text-base-50">Direct</h3>
+        <p class="text-sm text-base-600 dark:text-base-300">
+          Email is best for high-context questions, design reviews, or collaboration ideas.
+        </p>
+        <a href={`mailto:${SITE.social.email}`} class="text-sm font-medium hover:text-accent">{SITE.social.email}</a>
+      </div>
+      <div class="surface p-6 space-y-4">
+        <h3 class="text-lg font-semibold text-base-950 dark:text-base-50">Social</h3>
+        <div class="flex flex-col gap-2 text-sm">
+          <a href={SITE.social.github} class="hover:text-accent">GitHub</a>
+          <a href={SITE.social.linkedin} class="hover:text-accent">LinkedIn</a>
+          <a href={SITE.social.twitter} class="hover:text-accent">Twitter</a>
+          <a href={SITE.social.calendar} class="hover:text-accent">Calendar</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</SiteLayout>

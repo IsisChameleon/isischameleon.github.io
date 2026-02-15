@@ -1,0 +1,25 @@
+---
+import SiteLayout from '@/layouts/SiteLayout.astro';
+import SectionHeading from '@/components/SectionHeading.astro';
+import ExperienceItem from '@/components/ExperienceItem.astro';
+import { getCollection } from 'astro:content';
+
+const experience = (await getCollection('experience')).sort((a, b) => {
+  const dateA = new Date(`${a.data.start}-01`).getTime();
+  const dateB = new Date(`${b.data.start}-01`).getTime();
+  return dateB - dateA;
+});
+---
+<SiteLayout title="Experience" description="Professional roles with measurable impact.">
+  <section class="section-block">
+    <SectionHeading
+      title="Experience"
+      subtitle="Roles, impact, and the systems work behind them. Replace TODO entries with your actual track record."
+    />
+    <div class="mt-10">
+      {experience.map((item) => (
+        <ExperienceItem item={item} />
+      ))}
+    </div>
+  </section>
+</SiteLayout>

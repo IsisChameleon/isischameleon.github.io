@@ -1,0 +1,22 @@
+---
+import { SITE } from '@/lib/site';
+
+const year = new Date().getFullYear();
+---
+<footer class="border-t border-base-200 dark:border-base-800 mt-16">
+  <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10 text-sm text-base-600 dark:text-base-300">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+      <div>
+        <div class="font-semibold text-base-900 dark:text-base-50">{SITE.name}</div>
+        <p class="mt-2 max-w-md">{SITE.description}</p>
+      </div>
+      <div class="flex flex-wrap gap-4">
+        <a href={SITE.social.github} class="hover:text-accent">GitHub</a>
+        <a href={SITE.social.linkedin} class="hover:text-accent">LinkedIn</a>
+        <a href={SITE.social.twitter} class="hover:text-accent">Twitter</a>
+        <a href={`mailto:${SITE.social.email}`} class="hover:text-accent">Email</a>
+      </div>
+    </div>
+    <div class="mt-8 text-xs text-base-500">© {year}. Built with Astro.</div>
+  </div>
+</footer>

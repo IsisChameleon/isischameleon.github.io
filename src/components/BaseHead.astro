@@ -1,0 +1,31 @@
+---
+import { SITE } from '@/lib/site';
+
+const { title, description, image, canonical, noindex } = Astro.props;
+const metaTitle = title ? `${title} | ${SITE.name}` : SITE.title;
+const metaDescription = description ?? SITE.description;
+const metaImage = image ?? `${SITE.url}/og.svg`;
+const canonicalUrl = canonical ?? new URL(Astro.url.pathname, SITE.url).toString();
+---
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<meta name="description" content={metaDescription} />
+<link rel="canonical" href={canonicalUrl} />
+<link rel="icon" href="/favicon.svg" />
+<link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml" />
+{noindex ? <meta name="robots" content="noindex, nofollow" /> : null}
+
+<title>{metaTitle}</title>
+
+<meta property="og:site_name" content={SITE.name} />
+<meta property="og:type" content="website" />
+<meta property="og:title" content={metaTitle} />
+<meta property="og:description" content={metaDescription} />
+<meta property="og:url" content={canonicalUrl} />
+<meta property="og:image" content={metaImage} />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={metaTitle} />
+<meta name="twitter:description" content={metaDescription} />
+<meta name="twitter:image" content={metaImage} />
