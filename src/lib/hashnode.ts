@@ -1,6 +1,7 @@
 import { SITE } from './site';
 
 const HASHNODE_API = 'https://gql.hashnode.com';
+const HASHNODE_MAX_PAGE_SIZE = 50;
 
 export type HashnodeTag = {
   name: string;
@@ -38,11 +39,24 @@ async function hashnodeFetch<T>(query: string, variables: Record<string, unknown
     body: JSON.stringify({ query, variables }),
   });
 
+  const responseText = await response.text();
+
   if (!response.ok) {
-    throw new Error(`Hashnode API error: ${response.status} ${response.statusText}`);
+    let details = responseText;
+    try {
+      const errorPayload = JSON.parse(responseText) as GraphQLResponse<unknown>;
+      if (errorPayload.errors?.length) {
+        details = errorPayload.errors.map((error) => error.message).join(', ');
+      }
+    } catch {
+      // Preserve raw response text when JSON parsing is not possible.
+    }
+
+    const suffix = details ? ` - ${details}` : '';
+    throw new Error(`Hashnode API error: ${response.status} ${response.statusText}${suffix}`);
   }
 
-  const payload = (await response.json()) as GraphQLResponse<T>;
+  const payload = JSON.parse(responseText) as GraphQLResponse<T>;
 
   if (payload.errors?.length) {
     throw new Error(payload.errors.map((error) => error.message).join(', '));
@@ -57,9 +71,9 @@ async function hashnodeFetch<T>(query: string, variables: Record<string, unknown
 
 export async function fetchPosts(limit = 10): Promise<HashnodePostSummary[]> {
   const query = `
-    query PublicationPosts($host: String!, $first: Int!) {
+    query PublicationPosts($host: String!, $first: Int!, $after: String) {
       publication(host: $host) {
-        posts(first: $first) {
+        posts(first: $first, after: $after) {
           edges {
             node {
               title
@@ -70,18 +84,50 @@ export async function fetchPosts(limit = 10): Promise<HashnodePostSummary[]> {
               tags { name slug }
             }
           }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
         }
       }
     }
   `;
 
-  const data = await hashnodeFetch<{
-    publication: {
-      posts: { edges: Array<{ node: HashnodePostSummary }> };
-    } | null;
-  }>(query, { host: SITE.hashnodeHost, first: limit });
+  const safeLimit = Math.max(0, Math.trunc(limit));
+  if (safeLimit === 0) {
+    return [];
+  }
 
-  return data.publication?.posts.edges.map((edge) => edge.node) ?? [];
+  const posts: HashnodePostSummary[] = [];
+  let after: string | null = null;
+  let hasNextPage = true;
+
+  while (posts.length < safeLimit && hasNextPage) {
+    const first = Math.min(HASHNODE_MAX_PAGE_SIZE, safeLimit - posts.length);
+    const data = await hashnodeFetch<{
+      publication: {
+        posts: {
+          edges: Array<{ node: HashnodePostSummary }>;
+          pageInfo?: { hasNextPage?: boolean | null; endCursor?: string | null } | null;
+        };
+      } | null;
+    }>(query, { host: SITE.hashnodeHost, first, after });
+
+    const connection = data.publication?.posts;
+    if (!connection) {
+      break;
+    }
+
+    posts.push(...connection.edges.map((edge) => edge.node));
+    hasNextPage = Boolean(connection.pageInfo?.hasNextPage);
+    after = connection.pageInfo?.endCursor ?? null;
+
+    if (!after) {
+      break;
+    }
+  }
+
+  return posts;
 }
 
 export async function fetchPost(slug: string): Promise<HashnodePost | null> {
