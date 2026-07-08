@@ -13,12 +13,15 @@ const posts = await fetchPosts(3);
   <section class="section-block">
     <div class="grid gap-10 md:grid-cols-[1.2fr_0.8fr] items-center">
       <div class="space-y-6">
-        <p class="text-xs uppercase tracking-[0.3em] text-base-400">Systems engineering</p>
+        <p class="text-xs uppercase tracking-[0.3em] text-base-400">AI engineering · Voice agents · Sydney</p>
         <h1 class="text-3xl md:text-4xl font-semibold tracking-tight text-base-950 dark:text-base-50">
-          TODO: Short headline about building reliable production systems.
+          I turn frontier AI into production systems people actually use.
         </h1>
         <p class="text-base-600 dark:text-base-300 max-w-xl">
-          TODO: 2–3 sentences that summarize your focus areas, constraints you care about, and the kinds of systems you build.
+          Founding engineer at an AI startup, previously technical lead at NAB. I bring 20+ years of shipping
+          payments and data infrastructure at scale — 3,000 claims/hour across 97,000 providers — to building
+          real-time voice agents and LLM systems end to end: discovery, system design, full-stack build
+          (Python, TypeScript), and production rollout on GCP and AWS.
         </p>
         <div class="flex flex-wrap gap-3 text-sm">
           <a href="/projects" class="rounded-full border border-base-200 dark:border-base-800 px-4 py-2 hover:border-accent/60">View projects</a>
@@ -28,17 +31,17 @@ const posts = await fetchPosts(3);
       <div class="surface p-6 space-y-4">
         <h2 class="text-lg font-semibold text-base-950 dark:text-base-50">Now</h2>
         <ul class="space-y-3 text-sm text-base-600 dark:text-base-300">
-          <li>TODO: Current role focus.</li>
-          <li>TODO: Current system or product focus.</li>
-          <li>TODO: Personal operating principle or constraint.</li>
+          <li>Building EmberTales — an AI reading companion for children, live in production at app.embertales.ai.</li>
+          <li>Open source: voicebox, an MCP server that lets a coding agent voice-test browser-based voice agents.</li>
+          <li>Selected for the inaugural Women in AI Accelerator (Build Club × v0 by Vercel, 2026).</li>
         </ul>
       </div>
     </div>
   </section>
 
   <section class="section-block">
-    <SectionHeading title="Selected projects" subtitle="Three recent builds with clear constraints and outcomes." />
-    <div class="mt-8 grid gap-6 md:grid-cols-3">
+    <SectionHeading title="Selected projects" subtitle="Two recent builds — real-time voice AI, shipped end to end." />
+    <div class="mt-8 grid gap-6 md:grid-cols-2">
       {projects.map((project) => (
         <ProjectCard project={project} />
       ))}
