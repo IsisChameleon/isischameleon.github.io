@@ -1,7 +1,11 @@
 ---
 const { item } = Astro.props;
 const { data } = item;
-const timeLabel = data.end ? `${data.start} — ${data.end}` : `${data.start} — Present`;
+const formatDate = (value) => {
+  if (/^\d{4}$/.test(value)) return value;
+  return new Date(`${value}-01`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+};
+const timeLabel = data.end ? `${formatDate(data.start)} — ${formatDate(data.end)}` : `${formatDate(data.start)} — Present`;
 ---
 <div class="relative pl-8 pb-10">
   <div class="absolute left-0 top-2 h-3 w-3 rounded-full bg-accent"></div>

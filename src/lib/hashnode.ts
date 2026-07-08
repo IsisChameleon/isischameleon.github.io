@@ -1,7 +1,8 @@
 import { SITE } from './site';
 
-const HASHNODE_API = 'https://gql.hashnode.com';
-const HASHNODE_MAX_PAGE_SIZE = 50;
+// Hashnode retired free GraphQL API access (May 2026), so posts are sourced
+// from the publication's public RSS feed instead.
+const FEED_URL = `https://${SITE.hashnodeHost}/rss.xml`;
 
 export type HashnodeTag = {
   name: string;
@@ -25,132 +26,72 @@ export type HashnodePost = HashnodePostSummary & {
   readTimeInMinutes?: number | null;
 };
 
-type GraphQLResponse<T> = {
-  data?: T;
-  errors?: Array<{ message: string }>;
+const decodeField = (value: string): string => {
+  const cdata = value.match(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/);
+  if (cdata) return cdata[1];
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
 };
 
-async function hashnodeFetch<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-  const response = await fetch(HASHNODE_API, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
+const field = (block: string, tag: string): string => {
+  const match = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
+  return match ? decodeField(match[1]).trim() : '';
+};
+
+const parseItem = (block: string): HashnodePost => {
+  const link = field(block, 'link');
+  const tags = Array.from(block.matchAll(/<category>([\s\S]*?)<\/category>/g)).map((match) => {
+    const name = decodeField(match[1]).trim();
+    return { name, slug: name.toLowerCase().replace(/\s+/g, '-') };
   });
+  const enclosure = block.match(/<enclosure[^>]*url="([^"]+)"/);
+  const html = field(block, 'content:encoded');
 
-  const responseText = await response.text();
+  return {
+    title: field(block, 'title'),
+    slug: new URL(link).pathname.replace(/^\//, ''),
+    brief: field(block, 'description'),
+    publishedAt: new Date(field(block, 'pubDate')).toISOString(),
+    coverImage: enclosure ? { url: enclosure[1] } : null,
+    tags,
+    content: html ? { html } : null,
+  };
+};
 
-  if (!response.ok) {
-    let details = responseText;
-    try {
-      const errorPayload = JSON.parse(responseText) as GraphQLResponse<unknown>;
-      if (errorPayload.errors?.length) {
-        details = errorPayload.errors.map((error) => error.message).join(', ');
-      }
-    } catch {
-      // Preserve raw response text when JSON parsing is not possible.
+let feedPromise: Promise<HashnodePost[]> | null = null;
+
+const loadFeed = async (): Promise<HashnodePost[]> => {
+  try {
+    const response = await fetch(FEED_URL);
+    if (!response.ok) {
+      throw new Error(`Hashnode RSS error: ${response.status} ${response.statusText}`);
     }
-
-    const suffix = details ? ` - ${details}` : '';
-    throw new Error(`Hashnode API error: ${response.status} ${response.statusText}${suffix}`);
-  }
-
-  const payload = JSON.parse(responseText) as GraphQLResponse<T>;
-
-  if (payload.errors?.length) {
-    throw new Error(payload.errors.map((error) => error.message).join(', '));
-  }
-
-  if (!payload.data) {
-    throw new Error('Hashnode API returned no data.');
-  }
-
-  return payload.data;
-}
-
-export async function fetchPosts(limit = 10): Promise<HashnodePostSummary[]> {
-  const query = `
-    query PublicationPosts($host: String!, $first: Int!, $after: String) {
-      publication(host: $host) {
-        posts(first: $first, after: $after) {
-          edges {
-            node {
-              title
-              slug
-              brief
-              publishedAt
-              coverImage { url }
-              tags { name slug }
-            }
-          }
-          pageInfo {
-            hasNextPage
-            endCursor
-          }
-        }
-      }
-    }
-  `;
-
-  const safeLimit = Math.max(0, Math.trunc(limit));
-  if (safeLimit === 0) {
+    const xml = await response.text();
+    return xml
+      .split('<item>')
+      .slice(1)
+      .map((block) => parseItem(block.split('</item>')[0]));
+  } catch (error) {
+    console.warn(`[hashnode] Failed to load ${FEED_URL} — building without blog posts.`, error);
     return [];
   }
+};
 
-  const posts: HashnodePostSummary[] = [];
-  let after: string | null = null;
-  let hasNextPage = true;
+const getFeed = (): Promise<HashnodePost[]> => {
+  feedPromise ??= loadFeed();
+  return feedPromise;
+};
 
-  while (posts.length < safeLimit && hasNextPage) {
-    const first = Math.min(HASHNODE_MAX_PAGE_SIZE, safeLimit - posts.length);
-    const data = await hashnodeFetch<{
-      publication: {
-        posts: {
-          edges: Array<{ node: HashnodePostSummary }>;
-          pageInfo?: { hasNextPage?: boolean | null; endCursor?: string | null } | null;
-        };
-      } | null;
-    }>(query, { host: SITE.hashnodeHost, first, after });
-
-    const connection = data.publication?.posts;
-    if (!connection) {
-      break;
-    }
-
-    posts.push(...connection.edges.map((edge) => edge.node));
-    hasNextPage = Boolean(connection.pageInfo?.hasNextPage);
-    after = connection.pageInfo?.endCursor ?? null;
-
-    if (!after) {
-      break;
-    }
-  }
-
-  return posts;
+export async function fetchPosts(limit = 10): Promise<HashnodePostSummary[]> {
+  const posts = await getFeed();
+  return posts.slice(0, Math.max(0, Math.trunc(limit)));
 }
 
 export async function fetchPost(slug: string): Promise<HashnodePost | null> {
-  const query = `
-    query PublicationPost($host: String!, $slug: String!) {
-      publication(host: $host) {
-        post(slug: $slug) {
-          title
-          slug
-          brief
-          publishedAt
-          readTimeInMinutes
-          coverImage { url }
-          tags { name slug }
-          content { html markdown }
-        }
-      }
-    }
-  `;
-
-  const data = await hashnodeFetch<{
-    publication: { post: HashnodePost | null } | null;
-  }>(query, { host: SITE.hashnodeHost, slug });
-
-  return data.publication?.post ?? null;
+  const posts = await getFeed();
+  return posts.find((post) => post.slug === slug) ?? null;
 }

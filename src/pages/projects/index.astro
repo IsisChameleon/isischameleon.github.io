@@ -4,14 +4,16 @@ import SectionHeading from '@/components/SectionHeading.astro';
 import ProjectCard from '@/components/ProjectCard.astro';
 import { getCollection } from 'astro:content';
 
-const projects = await getCollection('projects');
+const projects = (await getCollection('projects')).sort(
+  (a, b) => Number(b.data.featured) - Number(a.data.featured)
+);
 const tags = Array.from(new Set(projects.flatMap((project) => project.data.tags))).sort();
 ---
 <SiteLayout title="Projects" description="Selected systems and product work.">
   <section class="section-block">
     <SectionHeading
       title="Projects"
-      subtitle="Filter by focus area. Each project summary should describe the constraint, the trade-off, and the outcome."
+      subtitle="Voice AI, RAG and data pipelines — built end to end, most of it open source."
     />
 
     <div class="mt-8 flex flex-wrap gap-2" data-tag-filters>
