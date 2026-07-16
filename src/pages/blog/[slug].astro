@@ -43,7 +43,7 @@ if (source === 'local') {
     brief: entry.data.description,
     publishedAt: entry.data.date.toISOString(),
     tags: entry.data.tags.map((name) => ({ name, slug: slugifyTag(name) })),
-    coverImageUrl: entry.data.cover ?? null,
+    coverImageUrl: entry.data.cover || null,
     html: null,
   };
 } else {
