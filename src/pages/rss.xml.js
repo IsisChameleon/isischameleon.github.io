@@ -1,9 +1,9 @@
 import rss from '@astrojs/rss';
 import { SITE } from '@/lib/site';
-import { fetchPosts } from '@/lib/hashnode';
+import { getMergedPosts } from '@/lib/posts';
 
 export async function GET() {
-  const posts = await fetchPosts(100);
+  const posts = await getMergedPosts();
 
   return rss({
     title: SITE.title,

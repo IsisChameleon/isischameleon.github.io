@@ -1,91 +1,89 @@
 ---
 import SiteLayout from '@/layouts/SiteLayout.astro';
-import { fetchPost, fetchPosts } from '@/lib/hashnode';
-import { getLocalPosts } from '@/lib/posts';
-import { markdown } from '@astropub/md';
+import { fetchPost, slugifyTag } from '@/lib/hashnode';
+import { getPostSources } from '@/lib/posts';
 import type { CollectionEntry } from 'astro:content';
 
 export async function getStaticPaths() {
-  const [hashnodePosts, localPosts] = await Promise.all([fetchPosts(200), getLocalPosts()]);
-  const localSlugs = new Set(localPosts.map((entry) => entry.slug));
-  const local = localPosts.map((entry) => ({
-    params: { slug: entry.slug },
-    props: { source: 'local' as const, entry },
-  }));
-  // Local posts win on slug collisions.
-  const hashnode = hashnodePosts
-    .filter((post) => !localSlugs.has(post.slug))
-    .map((post) => ({ params: { slug: post.slug }, props: { source: 'hashnode' as const, entry: null } }));
-  return [...local, ...hashnode];
+  const { hashnode, local } = await getPostSources();
+  return [
+    ...local.map((entry) => ({
+      params: { slug: entry.slug },
+      props: { source: 'local' as const, entry },
+    })),
+    ...hashnode.map((post) => ({
+      params: { slug: post.slug },
+      props: { source: 'hashnode' as const, entry: null },
+    })),
+  ];
 }
 
 type Props = { source: 'local' | 'hashnode'; entry: CollectionEntry<'blog'> | null };
+
+type PostView = {
+  title: string;
+  brief: string;
+  publishedAt: string;
+  tags: { name: string; slug: string }[];
+  coverImageUrl: string | null;
+  html: string | null;
+};
+
 const { source, entry } = Astro.props as Props;
 const { slug } = Astro.params;
 
+let view: PostView;
 let Content: Awaited<ReturnType<CollectionEntry<'blog'>['render']>>['Content'] | null = null;
-let title: string;
-let brief: string;
-let publishedAt: string;
-let tags: { name: string }[];
-let coverImageUrl: string | null = null;
-let html: string | null = null;
-let markdownHtml: string | null = null;
-let MarkdownContent: Awaited<ReturnType<typeof markdown>> | null = null;
-let readTimeInMinutes: number | null = null;
 
 if (source === 'local') {
   if (!entry) throw new Error(`Local blog post not found: ${slug}`);
-  const rendered = await entry.render();
-  Content = rendered.Content;
-  title = entry.data.title;
-  brief = entry.data.description;
-  publishedAt = entry.data.date.toISOString();
-  tags = entry.data.tags.map((name) => ({ name }));
+  Content = (await entry.render()).Content;
+  view = {
+    title: entry.data.title,
+    brief: entry.data.description,
+    publishedAt: entry.data.date.toISOString(),
+    tags: entry.data.tags.map((name) => ({ name, slug: slugifyTag(name) })),
+    coverImageUrl: null,
+    html: null,
+  };
 } else {
   const post = slug ? await fetchPost(slug) : null;
   if (!post) throw new Error(`Hashnode post not found: ${slug}`);
-  title = post.title;
-  brief = post.brief;
-  publishedAt = post.publishedAt;
-  tags = post.tags ?? [];
-  coverImageUrl = post.coverImage?.url ?? null;
-  readTimeInMinutes = post.readTimeInMinutes ?? null;
-  const markdownResult = post.content?.markdown ? await markdown(post.content.markdown) : null;
-  markdownHtml = typeof markdownResult === 'string' ? markdownResult : null;
-  MarkdownContent = typeof markdownResult === 'string' ? null : markdownResult;
-  html = post.content?.html ?? null;
+  view = {
+    title: post.title,
+    brief: post.brief,
+    publishedAt: post.publishedAt,
+    tags: post.tags ?? [],
+    coverImageUrl: post.coverImage?.url ?? null,
+    html: post.content?.html ?? null,
+  };
 }
 
-const formatted = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(publishedAt));
+const formatted = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(view.publishedAt));
 ---
-<SiteLayout title={title} description={brief}>
+<SiteLayout title={view.title} description={view.brief}>
   <article class="section-block">
     <div class="mx-auto max-w-3xl">
       <div class="text-xs uppercase tracking-[0.2em] text-base-400">{formatted}</div>
       <h1 class="mt-4 text-3xl md:text-4xl font-semibold tracking-tight text-base-950 dark:text-base-50">
-        {title}
+        {view.title}
       </h1>
-      <p class="mt-4 text-base-600 dark:text-base-300">{brief}</p>
+      <p class="mt-4 text-base-600 dark:text-base-300">{view.brief}</p>
       <div class="mt-4 flex flex-wrap gap-2 text-xs text-base-500">
-        {tags.map((tag) => (
+        {view.tags.map((tag) => (
           <span class="rounded-full border border-base-200 dark:border-base-800 px-3 py-1">{tag.name}</span>
         ))}
-        {readTimeInMinutes ? <span>{readTimeInMinutes} min read</span> : null}
       </div>
-      {coverImageUrl ? (
+      {view.coverImageUrl ? (
         <img
-          src={coverImageUrl}
-          alt={title}
+          src={view.coverImageUrl}
+          alt={view.title}
           class="mt-8 w-full rounded-2xl border border-base-200/60 dark:border-base-800/60"
           loading="eager"
         />
       ) : null}
       <div class="mt-10 prose">
-        {Content ? <Content /> : null}
-        {!Content && html ? <div set:html={html} /> : null}
-        {!Content && !html && markdownHtml ? <div set:html={markdownHtml} /> : null}
-        {!Content && !html && MarkdownContent ? <MarkdownContent /> : null}
+        {Content ? <Content /> : view.html ? <div set:html={view.html} /> : null}
       </div>
     </div>
   </article>

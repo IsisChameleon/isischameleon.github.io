@@ -2,6 +2,9 @@ import { SITE } from './site';
 
 // Hashnode retired free GraphQL API access (May 2026), so posts are sourced
 // from the publication's public RSS feed instead.
+// NOTE: the RSS feed only exposes the most recent posts (a bounded window),
+// so older posts fall off the feed as new ones are published. Mirror any post
+// that must stay up as local markdown in src/content/blog/ to keep its page.
 const FEED_URL = `https://${SITE.hashnodeHost}/rss.xml`;
 
 export type HashnodeTag = {
@@ -21,10 +24,10 @@ export type HashnodePostSummary = {
 export type HashnodePost = HashnodePostSummary & {
   content?: {
     html?: string | null;
-    markdown?: string | null;
   } | null;
-  readTimeInMinutes?: number | null;
 };
+
+export const slugifyTag = (name: string): string => name.toLowerCase().replace(/\s+/g, '-');
 
 const decodeField = (value: string): string => {
   const cdata = value.match(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/);
@@ -37,29 +40,39 @@ const decodeField = (value: string): string => {
     .replace(/&amp;/g, '&');
 };
 
+// RSS <description> may carry HTML; cards render briefs as plain text.
+const stripTags = (value: string): string => value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
 const field = (block: string, tag: string): string => {
   const match = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
   return match ? decodeField(match[1]).trim() : '';
 };
 
-const parseItem = (block: string): HashnodePost => {
-  const link = field(block, 'link');
-  const tags = Array.from(block.matchAll(/<category>([\s\S]*?)<\/category>/g)).map((match) => {
-    const name = decodeField(match[1]).trim();
-    return { name, slug: name.toLowerCase().replace(/\s+/g, '-') };
-  });
-  const enclosure = block.match(/<enclosure[^>]*url="([^"]+)"/);
-  const html = field(block, 'content:encoded');
+// Returns null on a malformed item so one bad entry is skipped instead of
+// aborting the whole feed (new URL / toISOString both throw on bad input).
+const parseItem = (block: string): HashnodePost | null => {
+  try {
+    const link = field(block, 'link');
+    const tags = Array.from(block.matchAll(/<category>([\s\S]*?)<\/category>/g)).map((match) => {
+      const name = decodeField(match[1]).trim();
+      return { name, slug: slugifyTag(name) };
+    });
+    const enclosure = block.match(/<enclosure[^>]*url="([^"]+)"/);
+    const html = field(block, 'content:encoded');
 
-  return {
-    title: field(block, 'title'),
-    slug: new URL(link).pathname.replace(/^\//, ''),
-    brief: field(block, 'description'),
-    publishedAt: new Date(field(block, 'pubDate')).toISOString(),
-    coverImage: enclosure ? { url: enclosure[1] } : null,
-    tags,
-    content: html ? { html } : null,
-  };
+    return {
+      title: field(block, 'title'),
+      slug: new URL(link).pathname.replace(/^\//, ''),
+      brief: stripTags(field(block, 'description')),
+      publishedAt: new Date(field(block, 'pubDate')).toISOString(),
+      coverImage: enclosure ? { url: enclosure[1] } : null,
+      tags,
+      content: html ? { html } : null,
+    };
+  } catch (error) {
+    console.warn('[hashnode] Skipping malformed RSS item.', error);
+    return null;
+  }
 };
 
 let feedPromise: Promise<HashnodePost[]> | null = null;
@@ -74,7 +87,8 @@ const loadFeed = async (): Promise<HashnodePost[]> => {
     return xml
       .split('<item>')
       .slice(1)
-      .map((block) => parseItem(block.split('</item>')[0]));
+      .map((block) => parseItem(block.split('</item>')[0]))
+      .filter((post): post is HashnodePost => post !== null);
   } catch (error) {
     console.warn(`[hashnode] Failed to load ${FEED_URL} — building without blog posts.`, error);
     return [];
@@ -86,12 +100,12 @@ const getFeed = (): Promise<HashnodePost[]> => {
   return feedPromise;
 };
 
-export async function fetchPosts(limit = 10): Promise<HashnodePostSummary[]> {
+export const fetchPosts = async (limit = 10): Promise<HashnodePostSummary[]> => {
   const posts = await getFeed();
   return posts.slice(0, Math.max(0, Math.trunc(limit)));
-}
+};
 
-export async function fetchPost(slug: string): Promise<HashnodePost | null> {
+export const fetchPost = async (slug: string): Promise<HashnodePost | null> => {
   const posts = await getFeed();
   return posts.find((post) => post.slug === slug) ?? null;
-}
+};

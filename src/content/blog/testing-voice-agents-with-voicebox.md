@@ -33,7 +33,7 @@ The app is none the wiser. From its point of view a normal caller joined with a 
 
 ## How the pieces fit
 
-![voicebox system diagram: Claude drives voicebox over MCP and Chromium over CDP; a Pipecat child process exchanges raw PCM audio with the injected shim over a WebSocket, while the page talks WebRTC to the app backend under test](/images/voicebox-architecture.png)
+<img src="/images/voicebox-architecture.png" alt="voicebox system diagram: Claude drives voicebox over MCP and Chromium over CDP; a Pipecat child process exchanges raw PCM audio with the injected shim over a WebSocket, while the page talks WebRTC to the app backend under test" width="1288" height="1000" loading="lazy" />
 
 <!-- The live animated version of this diagram is at /diagrams/voicebox-architecture.html if you want to link it. -->
 
