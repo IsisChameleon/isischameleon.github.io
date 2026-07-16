@@ -4,6 +4,7 @@ date: 2026-07-03
 description: "Six small experiments on two real repos, comparing grep-and-read exploration against graph queries with the codebase-memory MCP server. Spoiler: 8x to 281x fewer bytes into the context window, and the gap widens as the repo grows."
 tags: [mcp, llm-systems, dev-tools]
 draft: false
+cover: /images/blog/codebase-graph-cover.webp
 ---
 
 <!-- Edit freely. The numbers below are real measurements (July 2026), commands included so anyone can reproduce them. -->
@@ -11,6 +12,10 @@ draft: false
 Watch a coding agent explore an unfamiliar repo and you will see the same pattern every time: grep for a name, get a pile of matches, read three or four whole files to figure out which match matters. All of that lands in the context window. Tokens are money, but worse, they are attention: the more noise you stuff into the context, the more the model's focus degrades on the task you actually care about.
 
 [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) takes a different approach. It indexes your repository into a knowledge graph (functions, classes, routes as nodes; calls, imports, definitions as edges) and exposes it to the agent through MCP tools: `search_graph` to find symbols, `trace_path` to follow call chains, `get_code_snippet` to read exactly one symbol's source, and `query_graph` for raw Cypher when you want to get fancy.
+
+[![codebase-memory-mcp on GitHub](/images/blog/codebase-memory-mcp-og.webp)](https://github.com/DeusData/codebase-memory-mcp)
+
+Credit where it is due before we go any further: codebase-memory-mcp is open source and built by the [DeusData](https://github.com/DeusData) team — everything measured in this post is their work, I just put numbers on it. If the numbers below convince you, go give [the repo](https://github.com/DeusData/codebase-memory-mcp) a star.
 
 The pitch is that a structural question should get a structural answer, not a pile of files. I wanted to know what that is worth in practice, so I measured it.
 
@@ -22,6 +27,10 @@ The subject is [voicebox](https://github.com/IsisChameleon/voicebox), my voice-a
 - **grep way**: the grep output itself, plus the files the agent would then read (grep tells you *where* a name appears, not *what calls what*, so the reads are not optional)
 
 I report bytes because that is what I can measure exactly. A rough conversion for English-plus-code is 4 bytes per token, and since it applies to both sides equally, the ratios hold either way.
+
+Here is the projects dashboard with the repos indexed for this post — voicebox at 368 nodes, and the bigger one we will meet later at 5,190:
+
+![The Codebase Memory projects dashboard: six indexed repos, including voicebox (368 nodes / 793 edges) and readme (5,190 nodes / 15,794 edges)](/images/blog/codebase-memory-projects.webp)
 
 ## Experiment 1: who calls `compute_metrics`?
 
@@ -89,7 +98,9 @@ At roughly 4 bytes per token, the three questions cost about 1,900 tokens the gr
 
 ## Does it hold on a bigger codebase?
 
-That last claim deserved a test rather than a hand-wave, so I re-ran the same three question shapes on a much more substantive repo: readme, the codebase behind [EmberTales](https://app.embertales.ai), my AI reading companion for children. It is a full-stack app — a FastAPI + Pipecat voice-bot server in Python (about 24,000 lines across 160 files) plus a Next.js client — and it indexes to 5,190 nodes and 15,794 edges, fourteen times the voicebox graph.
+That last claim deserved a test rather than a hand-wave, so I re-ran the same three question shapes on a much more substantive repo: readme, the codebase behind [EmberTales](https://app.embertales.ai), my AI reading companion for children. It is a full-stack app — a FastAPI + Pipecat voice-bot server in Python (about 24,000 lines across 160 files) plus a Next.js client — and it indexes to 5,190 nodes and 15,794 edges, fourteen times the voicebox graph. This is what it looks like in the graph explorer:
+
+![The readme repo as codebase-memory sees it: 5,190 nodes and 15,794 edges](/images/blog/readme-graph.webp)
 
 **Experiment 4: who calls `Library.initialize_book` in production?** This is the book-loading seam of the whole app, and like any popular function in a codebase that has lived a while, its name has soaked into docstrings, comments and tests. Grep returns **61 hits**; excluding the test tree still leaves 11 hits across 4 files totaling 51,292 bytes, and almost all of them turn out to be prose — comments like *"progress to the store on initialize_book"* — not code. The graph answer, `trace_path(function_name="initialize_book", direction="inbound")`, is **186 bytes**: one production caller, `ReadingTools.select_book`. That is a **281x** difference, and it comes from something new: on a mature codebase, a function's name accumulates *mentions* much faster than it accumulates *callers*. Grep scales with mentions; the graph scales with callers.
 
