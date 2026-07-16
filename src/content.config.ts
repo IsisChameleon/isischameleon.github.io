@@ -26,6 +26,7 @@ const projects = defineCollection({
       .object({
         github: z.string().url().optional(),
         demo: z.string().url().optional(),
+        talk: z.string().url().optional(),
       })
       .optional(),
   }),
