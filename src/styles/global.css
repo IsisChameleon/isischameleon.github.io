@@ -104,11 +104,21 @@ a {
   }
 
   .prose code {
-    @apply font-mono text-sm bg-base-100 dark:bg-base-800 px-1.5 py-0.5 rounded;
+    @apply font-mono text-sm;
+  }
+
+  /* Inline code only: the pill background must NOT apply to code inside a
+     highlighted <pre>, where it fights the syntax theme's own colors. */
+  .prose :not(pre) > code {
+    @apply bg-base-100 dark:bg-base-800 px-1.5 py-0.5 rounded;
   }
 
   .prose pre {
     @apply bg-base-100 dark:bg-base-900 text-base-900 dark:text-base-100 rounded-xl p-4 overflow-x-auto;
+  }
+
+  .prose pre code {
+    @apply bg-transparent p-0 text-inherit;
   }
 
   .prose blockquote {
