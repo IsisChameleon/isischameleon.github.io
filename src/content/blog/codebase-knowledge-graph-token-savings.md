@@ -1,12 +1,12 @@
 ---
 title: Can a knowledge graph save your coding agent tokens?
-date: 2026-07-16
-description: "Three small experiments on a real repo, comparing grep-and-read exploration against graph queries with the codebase-memory MCP server. Spoiler: 10x to 36x fewer bytes into the context window."
+date: 2026-07-03
+description: "Six small experiments on two real repos, comparing grep-and-read exploration against graph queries with the codebase-memory MCP server. Spoiler: 8x to 281x fewer bytes into the context window, and the gap widens as the repo grows."
 tags: [mcp, llm-systems, dev-tools]
 draft: false
 ---
 
-<!-- Edit freely. The numbers below are real measurements from 2026-07-16, commands included so anyone can reproduce them. -->
+<!-- Edit freely. The numbers below are real measurements (July 2026), commands included so anyone can reproduce them. -->
 
 Watch a coding agent explore an unfamiliar repo and you will see the same pattern every time: grep for a name, get a pile of matches, read three or four whole files to figure out which match matters. All of that lands in the context window. Tokens are money, but worse, they are attention: the more noise you stuff into the context, the more the model's focus degrades on the task you actually care about.
 
@@ -87,10 +87,36 @@ trace_path(function_name="speak", direction="both", depth=2)
 
 At roughly 4 bytes per token, the three questions cost about 1,900 tokens the graph way and about 40,000 tokens the grep way. On a small repo. Asked once. A real agent session asks dozens of these questions, and on repos ten times this size the grep-side numbers scale with file sizes while the graph-side numbers barely move.
 
+## Does it hold on a bigger codebase?
+
+That last claim deserved a test rather than a hand-wave, so I re-ran the same three question shapes on a much more substantive repo: readme, the codebase behind [EmberTales](https://app.embertales.ai), my AI reading companion for children. It is a full-stack app — a FastAPI + Pipecat voice-bot server in Python (about 24,000 lines across 160 files) plus a Next.js client — and it indexes to 5,190 nodes and 15,794 edges, fourteen times the voicebox graph.
+
+**Experiment 4: who calls `Library.initialize_book` in production?** This is the book-loading seam of the whole app, and like any popular function in a codebase that has lived a while, its name has soaked into docstrings, comments and tests. Grep returns **61 hits**; excluding the test tree still leaves 11 hits across 4 files totaling 51,292 bytes, and almost all of them turn out to be prose — comments like *"progress to the store on initialize_book"* — not code. The graph answer, `trace_path(function_name="initialize_book", direction="inbound")`, is **186 bytes**: one production caller, `ReadingTools.select_book`. That is a **281x** difference, and it comes from something new: on a mature codebase, a function's name accumulates *mentions* much faster than it accumulates *callers*. Grep scales with mentions; the graph scales with callers.
+
+(Score one for grep, though: it also caught a call in `scripts/trace_reading_session.py`, a dev harness, which the graph missed — the call goes through a locally constructed instance the indexer did not resolve. More on that in the caveats.)
+
+**Experiment 5: one function from a big file.** `_build_qa_settings` lives at the very bottom of `state_manager.py`, a 698-line, 30,884-byte processor. `get_code_snippet` returned the exact 40-line method with its line range and metrics in **4,026 bytes** vs 30,884 to read the file: **7.7x**. As predicted in experiment 2, this ratio is just function-size over file-size, so it is the one number that looks the same on both repos.
+
+**Experiment 6: the common-word trap, harder mode.** The repo has a function called `get_client`. Grep finds **205 hits** — the output alone is 19,007 bytes — and here is the part grep cannot tell you at all: there are **two different functions with that name**, one returning the Supabase client (`shared/supabase.py`, 28 inbound edges) and one returning the Gemini client (`workers/pdf_pipeline/_gemini.py`, 10 inbound edges). Every one of those 205 hits looks identical in grep output; which client is this file talking to? The graph pair — `search_graph` to surface both definitions, then `trace_path` for the callers — costs **3,162 bytes** and answers with qualified names. A disciplined grep agent that only reads the 16 non-test files with hits ingests 79,806 bytes: **25x**.
+
+The two-repo scorecard:
+
+| Question | Repo | Graph way | Grep way | Savings |
+|---|---|---|---|---|
+| Who calls `compute_metrics`? | voicebox | 1,753 B | 62,732 B | 36x |
+| Source of `create_agent` | voicebox | 2,979 B | 30,094 B | 10x |
+| What does `speak` touch? | voicebox | 2,927 B | 68,473 B | 23x |
+| Who calls `initialize_book`? | readme | 186 B | 52,310 B | 281x |
+| Source of `_build_qa_settings` | readme | 4,026 B | 30,884 B | 7.7x |
+| What depends on `get_client`? | readme | 3,162 B | 79,806 B | 25x |
+
+The comparison came out more interesting than "same ratios, bigger repo". The snippet-fetch ratio is size-bound and stays put. But the *impact-analysis* ratio exploded from 36x to 281x, because that is the question where grep's cost grows with how often a name is written down and the graph's cost grows with how often it is actually called — and those two numbers diverge as a codebase matures. The common-word trap also changed character: on the big repo it stopped being about volume and became about *correctness*, because grep cannot disambiguate two functions that share a name, no matter how many bytes you feed it.
+
 ## Honest caveats
 
 - **Not every tool call is cheap.** `search_graph` returns rich node payloads (including internal fingerprint fields), so a broad search can cost a few thousand tokens. The discipline that works: search narrowly once to find the qualified name, then use `trace_path` and `get_code_snippet`, which are the genuinely compact calls.
 - **Grep is still the right tool for strings.** Looking for an error message, a config key, a TODO? grep. The graph wins on *structural* questions: callers, callees, impact, definitions.
+- **The graph can miss edges.** In experiment 4 it missed a real call site in a dev script, where the call goes through a locally built instance the indexer did not type-resolve. For impact analysis before a risky change, the cheap belt-and-braces move is one grep *after* the graph answer, to check for stragglers — you still avoid reading the files.
 - **There is an upfront indexing cost**, though it runs outside the context window, so it costs seconds, not tokens, and the index persists between sessions.
 - **Your numbers will differ.** The ratios depend on file sizes and how common your identifiers are. That is exactly why I included the commands: run them on your own repo.
 

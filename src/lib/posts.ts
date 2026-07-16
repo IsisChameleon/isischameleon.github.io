@@ -9,7 +9,7 @@ const localToSummary = (entry: CollectionEntry<'blog'>): PostSummary => ({
   slug: entry.slug,
   brief: entry.data.description,
   publishedAt: entry.data.date.toISOString(),
-  coverImage: null,
+  coverImage: entry.data.cover ? { url: entry.data.cover } : null,
   tags: entry.data.tags.map((name) => ({ name, slug: slugifyTag(name) })),
   source: 'local',
 });
