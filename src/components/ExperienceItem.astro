@@ -3,7 +3,9 @@ const { item } = Astro.props;
 const { data } = item;
 const formatDate = (value) => {
   if (/^\d{4}$/.test(value)) return value;
-  return new Date(`${value}-01`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  // timeZone UTC: 'YYYY-MM-01' parses as UTC midnight, so formatting in a
+  // negative-offset local zone would shift the label back a month.
+  return new Date(`${value}-01`).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 };
 const timeLabel = data.end ? `${formatDate(data.start)} — ${formatDate(data.end)}` : `${formatDate(data.start)} — Present`;
 ---
