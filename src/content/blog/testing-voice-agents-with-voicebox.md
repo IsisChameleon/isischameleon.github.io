@@ -4,6 +4,7 @@ date: 2026-07-16
 description: "How I gave my coding agent a voice and ears so it could test my voice app for me: the story of voicebox, an MCP server that grew out of Daily's pipecat-mcp-server."
 tags: [voice-ai, evals, mcp]
 draft: false
+cover: /images/blog/voicebox-cover.webp
 ---
 
 <!-- Feel free to edit: every section stands on its own, so you can cut, reorder or rewrite any of them independently. Places where a personal touch would land well are marked with comments like this one. -->
