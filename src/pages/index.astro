@@ -3,11 +3,11 @@ import SiteLayout from '@/layouts/SiteLayout.astro';
 import SectionHeading from '@/components/SectionHeading.astro';
 import ProjectCard from '@/components/ProjectCard.astro';
 import BlogCard from '@/components/BlogCard.astro';
-import { fetchPosts } from '@/lib/hashnode';
+import { getMergedPosts } from '@/lib/posts';
 import { getCollection } from 'astro:content';
 
 const projects = (await getCollection('projects')).filter((project) => project.data.featured).slice(0, 3);
-const posts = await fetchPosts(3);
+const posts = await getMergedPosts(3);
 ---
 <SiteLayout title="Home" description="Systems-oriented engineering work, projects, and writing.">
   <section class="section-block">
@@ -18,7 +18,7 @@ const posts = await fetchPosts(3);
           I turn frontier AI into production systems people actually use.
         </h1>
         <p class="text-base-600 dark:text-base-300 max-w-xl">
-          Founding engineer at an AI startup, previously technical lead at NAB. I bring 20+ years of shipping
+          Founding engineer at an AI startup, previously technical lead at NAB. I bring deep experience shipping
           payments and data infrastructure at scale — 3,000 claims/hour across 97,000 providers — to building
           real-time voice agents and LLM systems end to end: discovery, system design, full-stack build
           (Python, TypeScript), and production rollout on GCP and AWS.
@@ -52,7 +52,7 @@ const posts = await fetchPosts(3);
   </section>
 
   <section class="section-block">
-    <SectionHeading title="Latest writing" subtitle="Posts from Hashnode, mirrored here for long-form reading." />
+    <SectionHeading title="Writing" subtitle="Notes on voice AI, LLM systems, and production trade-offs." />
     <div class="mt-8 grid gap-6 md:grid-cols-3">
       {posts.map((post) => (
         <BlogCard post={post} />

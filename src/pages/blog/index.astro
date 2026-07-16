@@ -2,13 +2,13 @@
 import SiteLayout from '@/layouts/SiteLayout.astro';
 import SectionHeading from '@/components/SectionHeading.astro';
 import BlogCard from '@/components/BlogCard.astro';
-import { fetchPosts } from '@/lib/hashnode';
+import { getMergedPosts } from '@/lib/posts';
 
-const posts = await fetchPosts(50);
+const posts = await getMergedPosts(50);
 ---
 <SiteLayout title="Blog" description="Notes on systems engineering and production trade-offs.">
   <section class="section-block">
-    <SectionHeading title="Blog" subtitle="Posts fetched from Hashnode and rendered here." />
+    <SectionHeading title="Blog" subtitle="Notes on voice AI, LLM systems, and production trade-offs." />
 
     <div class="mt-6 max-w-md">
       <label class="text-xs uppercase tracking-[0.2em] text-base-400" for="post-search">Search</label>
