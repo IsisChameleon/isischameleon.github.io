@@ -7,7 +7,7 @@ const formatDate = (value) => {
   // negative-offset local zone would shift the label back a month.
   return new Date(`${value}-01`).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 };
-const timeLabel = data.end ? `${formatDate(data.start)} — ${formatDate(data.end)}` : `${formatDate(data.start)} — Present`;
+const timeLabel = data.end ? `${formatDate(data.start)} – ${formatDate(data.end)}` : `${formatDate(data.start)} – Present`;
 ---
 <div class="relative pl-8 pb-10">
   <div class="absolute left-0 top-2 h-3 w-3 rounded-full bg-accent"></div>
@@ -22,7 +22,7 @@ const timeLabel = data.end ? `${formatDate(data.start)} — ${formatDate(data.en
     <p class="text-sm text-base-600 dark:text-base-300">{data.summary}</p>
     <ul class="list-disc pl-5 text-sm text-base-600 dark:text-base-300">
       {data.impact.map((line) => (
-        <li>{line}</li>
+        <li set:html={line} />
       ))}
     </ul>
     <div class="flex flex-wrap gap-2 text-xs text-base-500">

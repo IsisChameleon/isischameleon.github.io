@@ -1,6 +1,6 @@
 ---
-title: Pipecat + Gemini screen-share demo
-summary: Connect to Gemini-powered Pipecat bots using the Voice UI Kit, with live screen sharing — the multimodal pattern behind voice agents that can see what the user sees.
+title: Pipecat screen-share demo
+summary: Connect to multimodal Pipecat bots using the Voice UI Kit, with live screen sharing — the pattern behind voice agents that can see what the user sees.
 tags:
   - Voice AI
   - WebRTC
