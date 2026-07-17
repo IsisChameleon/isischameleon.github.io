@@ -22,6 +22,8 @@ const projects = defineCollection({
     tags: z.array(z.string()),
     featured: z.boolean().default(false),
     status: z.string().optional(),
+    // Slug of a local blog post that writes this project up.
+    blog: z.string().optional(),
     links: z
       .object({
         github: z.string().url().optional(),
