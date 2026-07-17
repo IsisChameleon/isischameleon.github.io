@@ -7,6 +7,7 @@ tags:
   - MCP
 featured: true
 status: Open source
+blog: testing-voice-agents-with-voicebox
 links:
   github: https://github.com/IsisChameleon/voicebox
 ---
