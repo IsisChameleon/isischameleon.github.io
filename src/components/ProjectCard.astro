@@ -4,8 +4,11 @@ import TagPill from './TagPill.astro';
 const { project } = Astro.props;
 const { data } = project;
 
-// The card's destination: the write-up if one exists, else the live app, else the source.
-const primaryHref = data.blog ? `/blog/${data.blog}` : data.links?.demo ?? data.links?.github;
+// The card's destination: the write-up if one exists, else the live app, else the
+// talk, else the source.
+const primaryHref = data.blog
+  ? `/blog/${data.blog}`
+  : data.links?.demo ?? data.links?.talk ?? data.links?.github;
 ---
 <article class="surface relative p-6 flex flex-col gap-4 transition-colors hover:border-accent/60">
   <div>
@@ -37,7 +40,7 @@ const primaryHref = data.blog ? `/blog/${data.blog}` : data.links?.demo ?? data.
       {data.links?.demo ? (
         <a href={data.links.demo} class="hover:text-accent">Live demo →</a>
       ) : null}
-      {data.links.talk ? (
+      {data.links?.talk ? (
         <a href={data.links.talk} class="hover:text-accent">Watch the talk →</a>
       ) : null}
     </div>
