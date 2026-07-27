@@ -9,6 +9,10 @@ cover: /images/blog/voicebox-cover.webp
 
 <!-- Feel free to edit: every section stands on its own, so you can cut, reorder or rewrite any of them independently. Places where a personal touch would land well are marked with comments like this one. -->
 
+**Repo:** [github.com/IsisChameleon/voicebox](https://github.com/IsisChameleon/voicebox)
+
+<!-- TODO: embed demo clip here once recorded -->
+
 If you are building a browser voice agent, you already know the loop. You tweak a prompt, then you open the tab, join the call, talk to the bot, listen, try to interrupt it, try to break it. By hand. Every single time.
 
 I hit this wall building readme, a voice app where an AI companion reads books with children. Claude Code was writing most of the pipeline changes, but it had no way to check its own work: it could not hear whether the app still greeted you properly, whether barge-in still worked, whether latency had regressed. I was the only tester, and I was slow.
@@ -38,7 +42,7 @@ The app is none the wiser. From its point of view a normal caller joined with a 
 
 <!-- The live animated version of this diagram is at /diagrams/voicebox-architecture.html if you want to link it. -->
 
-Three processes, and one rule that keeps the design honest: **audio never crosses the MCP boundary**. MCP carries text and control only. The actual audio flows out-of-band, as raw 16-bit PCM over a WebSocket between the shim inside the page and a Pipecat child process. The parent process hosts the MCP endpoint and no audio code at all, so a busy pipeline can never block a tool call.
+Three processes, and one rule that shapes the whole design: **audio never crosses the MCP boundary**. MCP carries text and control only. The actual audio flows out-of-band, as raw 16-bit PCM over a WebSocket between the shim inside the page and a Pipecat child process. The parent process hosts the MCP endpoint and no audio code at all, so a busy pipeline can never block a tool call.
 
 The MCP surface is deliberately tiny:
 
@@ -55,11 +59,25 @@ Notice what is missing: no click, no navigate. voicebox owns the browser but han
 
 This is the part I wish someone had written down before I started.
 
+Nearly all of it comes from one thing, so it is worth saying up front: **the pipeline is inverted**. A normal Pipecat pipeline is a bot talking to a human, so audio comes in from the human's microphone and goes out to the human's speaker. voicebox keeps exactly the same shape and swaps who sits at each end.
+
+```
+standard Pipecat    human mic  -->  STT  -->   LLM    -->  TTS  -->  speaker
+                    input: the human user                    output: the bot
+
+voicebox            bot audio  -->  STT  --> (no LLM) -->  TTS  -->  fake mic
+                    input: the bot under test          output: the fake user
+```
+
+The stage list really is the ordinary one, `transport.input() -> Whisper -> aggregator -> Kokoro -> transport.output()`. What changed is the cast. The audio arriving at the input is the bot I am testing, tapped off its WebRTC track by the shim. The Kokoro audio leaving the output is my fake user, injected into the page's microphone. And there is no LLM in the middle at all: when Claude calls `speak("hi Ember")`, voicebox fakes an LLM response by queueing `LLMFullResponseStartFrame -> LLMTextFrame -> LLMFullResponseEndFrame`, and TTS happily says it out loud.
+
+So every time Pipecat says "user" it means the bot under test, and every time it says "bot" it means my synthetic tester. In the code that mapping lives in exactly one place, the pipeline observer that renames Pipecat's frames into voicebox's own events (`app_bot_speech_started`, `tester_speech_started`, and friends), so nothing downstream has to think backwards. It still leaks out in odd corners: Pipecat's `AudioBufferProcessor` keeps a `_user_audio_buffer` and a `_bot_audio_buffer`, which for me hold the app bot and the tester respectively, so I interleave the stereo recording by hand or the channels come out swapped.
+
 **The recording that played back too fast.** My first audio tap used WebCodecs (`MediaStreamTrackProcessor`). It worked, except the recorded WAV of the bot played back several times faster than real time, like a chipmunk. The reason: on a remote WebRTC track, WebCodecs only emits chunks during active speech. Silence is simply dropped, so the byte stream is sparse and everything downstream compresses in time. The fix was to tap through Web Audio instead (`MediaStreamAudioSourceNode` into an `AudioWorkletNode`), which is pulled by the audio clock at a fixed rate, so silence becomes literal zero samples and real-time pacing survives.
 
 **Whisper-MLX hard-assumes 16 kHz.** `mlx_whisper.transcribe()` has no sample rate parameter at all. Rather than resample in Python, the shim's outbound `AudioContext` simply runs at 16 kHz and lets the browser do the 48 to 16 resample natively. Kokoro stays at 48 kHz on the way in, so the synthetic mic the app hears is full quality. The sample rates are asymmetric on the wire and that is fine.
 
-**Pipecat's defaults are tuned for a different job.** Its default VAD `stop_secs` of 0.2 s expects clean TTS input and chopped my remote speech mid-sentence (1.0 s works). And its default interruption behaviour meant that the moment the bot started talking, our own in-flight speech got cancelled. Reasonable for an assistant, fatal for a tester whose whole job is sometimes to talk over the bot.
+**Pipecat's defaults are tuned for a different job.** Both defaults that hurt me follow straight from the inversion, because they are sensible things to assume about a *human* on the input side. Its default VAD `stop_secs` of 0.2 s expects the clean, crisply-ending audio of a TTS source; what actually arrives is a bot's voice over WebRTC with natural pauses in it, and 0.2 s chopped that mid-sentence into single-word transcripts (1.0 s works). And its user-turn strategies ship with `enable_interruptions=True`, which is the right call for an assistant: the human started talking, so shut the assistant up. Here the "human" is the bot under test, so the moment it made a sound my own in-flight Kokoro speech got cancelled. Reasonable for an assistant, fatal for a tester whose whole job is sometimes to talk over the bot.
 
 ## From remote-controlled mouth to test harness
 
@@ -72,11 +90,11 @@ First, nobody polls. Every serious tool makes the synthetic caller a full voice 
 That research turned into a staged rebuild:
 
 - **Full-duplex IPC.** Every command carries a correlation id, so `speak` can fire while a `listen` is pending. Talk-over became physically possible.
-- **An event stream instead of a transcript string.** `listen` now returns timestamped events (`bot_speech_started`, `transcript`, `tts_interrupted`, ...) with a cursor, so Claude never misses or re-reads anything.
+- **An event stream instead of a transcript string.** `listen` now returns timestamped events (`app_bot_speech_started`, `app_bot_transcript`, `tester_speech_interrupted`, ...) with a cursor, so Claude never misses or re-reads anything.
 - **Declarative barge-in.** `speak(text, when="app_bot_speech_started", timer_secs=1.5)` arms a one-shot trigger in the audio child: next time the bot starts talking, wait 1.5 s, then speak. Reproducible interruptions, scheduled at audio rate, no LLM in the hot path.
-- **Artifacts.** Every session writes a stereo WAV (tester on one channel, bot on the other, a convention borrowed from EVA), plus `events.json` and `metrics.json` with per-turn response latency, dead-air gaps and talk-over windows. A test that does not leave evidence behind is just a demo.
+- **Artifacts.** Pass a `record_dir` and the session writes the artifacts you need to review it afterwards: `events.json` (the whole event log), `metrics.json` (per-turn response latency, dead-air gaps, talk-over windows), and three WAVs, each voice on its own plus a stereo merge with the tester on one channel and the bot on the other, so an overlap stays audible as two voices instead of being summed into one waveform.
 
-The one place voicebox genuinely differs from all of those tools: they join calls through APIs (phone numbers, LiveKit rooms), which requires the platform's cooperation. The browser shim reaches apps whose WebRTC internals you cannot join at all, anything that only exists as a webpage. That gap is the niche.
+Where voicebox differs: every one of those tools reaches the agent under test through something the platform has to hand it, a phone number, a room URL and token, or a WebSocket endpoint you expose. The browser shim needs none of that. It reaches apps whose WebRTC internals you cannot join at all, anything that only exists as a webpage, and none of the tools I looked at do that. That gap is the niche.
 
 ## Try it
 
@@ -88,11 +106,15 @@ voicebox   # MCP server on http://localhost:9090/mcp
 claude mcp add voicebox --transport http http://localhost:9090/mcp --scope user
 ```
 
-Local models by default, so no API keys to run it. Point it at any browser voice app and ask your coding agent to have a chat with it.
+Local models by default, so no API keys to run it. Apple Silicon gets Whisper-MLX on the GPU; everywhere else it is faster-whisper on the CPU, which works but is slower. Point it at any browser voice app and ask your coding agent to have a chat with it.
 
 What is next: a scenario layer (persona, goal, success criteria, run it N times, judge the transcript and metrics afterwards), and maybe session replay, where a recorded failing call becomes a regression test.
 
 <!-- Personal closing line? e.g. what it felt like the first time Claude interrupted the bot on its own. -->
+
+## If you try it, tell me what broke
+
+I am after a handful of early testers, and there are three specific things I need to know. First, whether the install and your very first session worked at all on your machine. Second, whether the shim actually caught your app's audio path, and which stack that was: Daily, LiveKit, a plain `RTCPeerConnection`, or something living inside an iframe (that last one I expect to fail). Third, whatever broke, with the traceback if you have one. [Open an issue](https://github.com/IsisChameleon/voicebox/issues) and say which of the three you are reporting.
 
 ## Credits
 
