@@ -94,7 +94,7 @@ That research turned into a staged rebuild:
 - **Declarative barge-in.** `speak(text, when="app_bot_speech_started", timer_secs=1.5)` arms a one-shot trigger in the audio child: next time the bot starts talking, wait 1.5 s, then speak. Reproducible interruptions, scheduled at audio rate, no LLM in the hot path.
 - **Artifacts.** Pass a `record_dir` and the session writes the artifacts you need to review it afterwards: `events.json` (the whole event log), `metrics.json` (per-turn response latency, dead-air gaps, talk-over windows), and three WAVs, each voice on its own plus a stereo merge with the tester on one channel and the bot on the other, so an overlap stays audible as two voices instead of being summed into one waveform.
 
-Where voicebox differs: every one of those tools reaches the agent under test through something the platform has to hand it, a phone number, a room URL and token, or a WebSocket endpoint you expose. The browser shim needs none of that. It reaches apps whose WebRTC internals you cannot join at all, anything that only exists as a webpage, and none of the tools I looked at do that. That gap is the niche.
+What the shim buys is that it needs nothing from the app: no phone number, no room URL and token, no WebSocket endpoint to expose, no cooperation of any kind. If your voice agent exists as a webpage, that is already enough to test it.
 
 ## Try it
 
