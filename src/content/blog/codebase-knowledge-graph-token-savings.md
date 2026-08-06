@@ -51,7 +51,7 @@ On readme the same question is `Library.initialize_book`, the book-loading seam 
 
 The gap between 36x and 281x is the most interesting number in this post, and I had not anticipated it. On a mature codebase a function's name accumulates *mentions* far faster than it accumulates *callers*. Grep scales with mentions. The graph scales with callers. Those two diverge as a codebase ages.
 
-Score one for grep, though: it also caught a call in `scripts/trace_reading_session.py`, a dev harness, which the graph missed because the call goes through a locally constructed instance the indexer did not resolve. Hold that thought.
+Score one for grep, though: it also caught a call in `scripts/trace_reading_session.py`, a dev harness, which the graph missed because the call goes through a locally constructed instance the indexer did not resolve.
 
 ## Question 2: show me one function
 
@@ -131,7 +131,7 @@ Token savings are what you can put in a table, so that is what gets written abou
 
 **An architecture read on a repo you have never seen.** `get_architecture` returns languages, packages, routes, hotspots, layers and clusters in one call. The clusters come from community detection over the call graph, so they surface the de-facto modules rather than your folder names. On voicebox it correctly picks `speak` as the top hotspot by fan-in. Try it on a repo you just joined, before you start reading files.
 
-**Complexity and hot paths, as a query.** Every function node carries `cyclomatic`, `cognitive`, `loop_depth`, and the one I actually use, `transitive_loop_depth`, which propagates worst-case nested-loop degree along `CALLS` edges. There is also `linear_scan_in_loop`, counting `find`/`contains`-style scans inside a loop, the hidden O(n²) that plain loop nesting misses:
+**Complexity and hot paths, as a query.** Every function node carries `cyclomatic`, `cognitive`, `loop_depth`, and the interesting one, `transitive_loop_depth`, which propagates worst-case nested-loop degree along `CALLS` edges. There is also `linear_scan_in_loop`, counting `find`/`contains`-style scans inside a loop, the hidden O(n²) that plain loop nesting misses:
 
 ```
 MATCH (f:Function)
@@ -140,11 +140,11 @@ RETURN f.name, f.transitive_loop_depth, f.complexity
 ORDER BY f.transitive_loop_depth DESC
 ```
 
-On readme that handed me `assemble_branching_chunks` at a transitive loop depth of 5, plus `_build_chapters` and `extract_manuscript` at 4. A performance to-do list I did not have to go looking for.
+On readme that returned `assemble_branching_chunks` at a transitive loop depth of 5, plus `_build_chapters` and `extract_manuscript` at 4. A performance to-do list, out of one query.
 
 **Searching by meaning, not spelling.** `search_graph` combines BM25 full-text with camelCase splitting, regex `name_pattern`, and `semantic_query`, a vector search that bridges vocabulary, so searching "send" finds something named "publish". The embeddings are compiled into the binary: no API key, no Ollama container to babysit.
 
-**Decisions that outlive the session.** `manage_adr` stores Architecture Decision Records in the graph. Given that my agent forgets everything between sessions, parking the "why" next to the "what" is the feature I underrated most.
+**Decisions that outlive the session.** `manage_adr` stores Architecture Decision Records in the graph. Given that an agent forgets everything between sessions, parking the "why" next to the "what" is the easiest feature here to overlook, and probably shouldn't be.
 
 **Two more worth knowing.** `detect_changes(project=..., since="HEAD~5")` maps a git diff to the symbols it touches and classifies the risk, which is a better pre-commit question than "what did I change". And `index_repository(mode="cross-repo-intelligence")` matches routes between separately indexed projects, which is how you trace a call from a Next.js client into the FastAPI handler serving it.
 
@@ -169,11 +169,11 @@ Two of those changed how I use the thing. `FILE_CHANGES_WITH` is not static anal
 
 Run `get_graph_schema(project=...)` to see which types your repo actually produced and how many of each, because it varies a lot by language and by how much history you have. voicebox gives me 425 `CALLS`, 344 `USAGE`, 84 `TESTS` and 27 `FILE_CHANGES_WITH`.
 
-## Three queries that earn their keep
+## Three queries worth knowing about
 
-The Cypher endpoint is the part I underused for months, because "you can write queries" is not a feature until someone shows you a query worth writing. Here are three I keep coming back to, run against voicebox on 0.9.0, with the output I actually got back.
+The Cypher endpoint is the part that is easiest to skip, because "you can write queries" is not a feature until you see a query worth writing. Here are three, run against voicebox on 0.9.0, with the output they returned.
 
-**1. What am I most likely to break?** Before touching anything in a repo I do not know well, I want the fan-in ranking: which functions does everything else lean on. Note the `STARTS WITH 'src/'` filter, which keeps Python builtins and the test tree out of the answer. Without it the top of the list is `len`, `append` and `print`, which is true and useless.
+**1. What am I most likely to break?** The fan-in ranking: which functions everything else leans on. The `STARTS WITH 'src/'` filter keeps Python builtins and the test tree out of the answer; without it the top of the list is `len`, `append` and `print`, which is true and useless.
 
 ```
 MATCH (a)-[:CALLS]->(b)
@@ -182,9 +182,9 @@ RETURN b.name, b.file_path, count(a) AS fan_in
 ORDER BY fan_in DESC
 ```
 
-On voicebox that puts `speak` on top with a fan-in of 12, then `_emit` at 8 and `_emit_app_bot_transcript` at 7. Which is the correct answer for a voice-agent repo, and it took one call instead of an afternoon.
+On voicebox: `speak` on top with a fan-in of 12, then `_emit` at 8 and `_emit_app_bot_transcript` at 7. The right answer for a voice-agent repo, in one call.
 
-**2. Which files always change together?** This is my favourite, because it is not a static-analysis question at all. The indexer mines your git history and creates `FILE_CHANGES_WITH` edges with a coupling score, so you can ask which files are *empirically* coupled regardless of whether there is a call edge between them:
+**2. Which files always change together?** Not a static-analysis question at all. The indexer mines your git history into `FILE_CHANGES_WITH` edges with a coupling score, so you can ask which files are *empirically* coupled whether or not there is a call edge between them:
 
 ```
 MATCH (a)-[r:FILE_CHANGES_WITH]->(b)
@@ -192,7 +192,7 @@ RETURN a.name, b.name, r.co_changes, r.coupling_score
 ORDER BY r.coupling_score DESC
 ```
 
-voicebox gave me `agent.py` and `events.py` at 6 co-changes and a coupling score of 1.00, and `bot.py` with `server.py` at 7 co-changes and 0.88. A perfect score means every single time I touched one, I touched the other. That is the signature of a leaky seam, and it is invisible to every other tool in this post. Do read the pairs with judgement though, because a source file and its own test file co-change for entirely healthy reasons, and several of my top hits are exactly that.
+On voicebox: `agent.py` with `events.py` at 6 co-changes and a coupling score of 1.00, `bot.py` with `server.py` at 7 and 0.88. A perfect score means the two never moved apart, which is the signature of a leaky seam, and it is invisible to every other tool in this post. Read the pairs with judgement though, because a source file and its own test file co-change for entirely healthy reasons, and several of the top hits are exactly that.
 
 **3. Dead code, with a large asterisk.** Every node carries an `in_degree` property specifically so you can ask this:
 
@@ -206,33 +206,16 @@ ORDER BY f.lines DESC
 
 One syntax note: `in_degree` is compared as a string, so it is `= '0'` and not `= 0`.
 
-The asterisk is that on voicebox this returned ten candidates and I would not delete a single one without looking first. `listen`, `speak` and `start_browser_session` in `server.py` are MCP tool handlers registered by decorator, so nothing in the repo calls them by name and they are about as far from dead as code gets. And `compute_metrics` is in the list at 62 lines, which is the exact function that eighteen real call sites point at. Treat this query as a list of things to go and look at, never as a list of things to delete.
+The asterisk: on voicebox this returned ten candidates and not one of them is safely deletable. `listen`, `speak` and `start_browser_session` in `server.py` are MCP tool handlers registered by decorator, so nothing in the repo calls them by name and they are about as far from dead as code gets. Treat this query as a list of things to go and look at, never as a list of things to delete.
 
 ## Where it falls down
 
-- **Not every tool call is cheap.** `search_graph` returns rich node payloads, so a broad search can cost a few thousand tokens. The discipline that works for me: search narrowly once to get the qualified name, then use `trace_path` and `get_code_snippet`, which are the compact calls.
+- **Not every tool call is cheap.** `search_graph` returns rich node payloads, so a broad search can cost a few thousand tokens. The pattern that keeps it cheap: search narrowly once to get the qualified name, then use `trace_path` and `get_code_snippet`, which are the compact calls.
 - **Grep is still the right tool for strings.** Looking for an error message, a config key, a TODO? grep. The graph wins on *structural* questions: callers, callees, impact, definitions.
-- **The graph can miss edges, and this one bit me properly.** It missed that dev-script call site on readme, and worse, my headline measurement stopped reproducing entirely. That one gets its own section, next.
+- **The graph can miss edges.** It missed that dev-script call site on readme, and the tool itself ships instructions telling your agent that "findings are provisional: do not make absence, exhaustive-impact, or dead-code claims" ([`src/mcp/mcp.c`](https://github.com/DeusData/codebase-memory-mcp/blob/main/src/mcp/mcp.c)). Presence you can trust. Absence you should verify: if a `trace_path` comes back empty and your gut says the function is used, spend one grep before you believe it. You still skip reading the files, so you keep almost all of the saving.
 - **There is an upfront indexing cost**, though it runs outside the context window, so it costs seconds rather than tokens, and the index persists between sessions.
 - **Your numbers will differ.** The ratios depend on file sizes and how common your identifiers are. That is exactly why I included the commands: run them on your own repo.
 
-## What happened to question 1
-
-The headline experiment of this post, the 36x one, does not reproduce for me today. Asking who calls `compute_metrics` now returns nothing:
-
-```
-trace_path(function_name="compute_metrics", direction="inbound", include_tests=true)
-  -->  {"callers":[]}
-```
-
-I assumed I was on an old build, so I updated from 0.8.1 to 0.9.0, re-indexed voicebox from scratch with an explicit `mode="full"`, and ran it again. Identical. Zero callers, against eighteen real call sites: one in `agent.py:653` and seventeen in `tests/test_metrics.py`.
-
-It is not the whole graph falling over. The node exists at the right file and line, it has nine *outbound* edges, and the `speak` trace from question 3 still works perfectly on the same index. The gap is startlingly narrow: exactly one hop in one chain. I built a minimal repo with six variants of the shape (function-local imports, nested `def`s, the call buried as an argument, `async`) to try to reproduce it, and all six resolved correctly, so none of my structural theories survived contact.
-
-I would have happily published any one of those theories as the explanation if I had not checked, which is the actual lesson. It is also a limitation the authors clearly know about, because the tool ships instructions telling your agent that "findings are provisional: do not make absence, exhaustive-impact, or dead-code claims" ([`src/mcp/mcp.c`](https://github.com/DeusData/codebase-memory-mcp/blob/main/src/mcp/mcp.c)). I wish more tools shipped that.
-
-So: the graph is excellent at telling you what *is* there, and that is where the 36x lives. It is not trustworthy for telling you what is *not* there. Presence, trust it. Absence, verify it. If a `trace_path` comes back empty and your gut says the function is used, spend one grep before you believe it. You still skip reading the files, so you keep almost all of the saving. And treat my 36x as a July measurement rather than a promise for today.
-
 The savings are what you can put in a table, but the thing I notice day to day is the quality difference. The graph answer contains the callers and nothing else, so the model reasons over signal instead of digging through noise. Less context rot, better answers, and my agent stops burning its budget on archaeology. 🙂
 
-Have you tried it on a repo much larger than mine, or in a language other than Python and TypeScript? I would love to know whether the impact-analysis ratio keeps climbing, and whether anyone can reproduce the missing `compute_metrics` callers. If you go looking with the queries above, tell me what your own repo's co-change pairs look like. Drop me a note, and tell me what you would like me to measure next.
+Have you tried it on a repo much larger than mine, or in a language other than Python and TypeScript? I would love to know whether the impact-analysis ratio keeps climbing. If you go looking with the queries above, tell me what your own repo's co-change pairs look like. Drop me a note, and tell me what you would like me to measure next.
